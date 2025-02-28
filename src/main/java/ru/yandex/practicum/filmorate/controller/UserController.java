@@ -7,39 +7,39 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
 @RequestMapping("/users")
 @Validated
 public class UserController {
-    private final List<User> users = new ArrayList<>();
+    private final Map<Integer, User> users = new HashMap<>();
 
     @PostMapping
     public User createUser(@Valid @RequestBody User user) {
         log.info("Создание пользователя: {}", user);
         user.setId(users.size() + 1);
-        users.add(user);
+        users.put(user.getId(), user);
         return user;
     }
 
     @PutMapping
     public User updateUser(@Valid @RequestBody User user) {
         log.info("Обновление пользователя: {}", user);
-        for (int i = 0; i < users.size(); i++) {
-            if (users.get(i).getId() == user.getId()) {
-                users.set(i, user);
-                return user;
-            }
+        if (!users.containsKey(user.getId())) {
+            log.warn("Пользователь с id={} не найден", user.getId());
+            throw new IllegalArgumentException("Пользователь с id=" + user.getId() + " не найден");
         }
-        log.warn("Пользователь с id={} не найден", user.getId());
-        throw new IllegalArgumentException("Пользователь с id=" + user.getId() + " не найден");
+        users.put(user.getId(), user);
+        return user;
     }
 
     @GetMapping
     public List<User> getAllUsers() {
         log.info("Получение всех пользователей");
-        return users;
+        return new ArrayList<>(users.values());
     }
 }
