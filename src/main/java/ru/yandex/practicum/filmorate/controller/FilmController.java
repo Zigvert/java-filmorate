@@ -19,13 +19,13 @@ import java.util.Map;
 @Validated
 public class FilmController {
     private final Map<Integer, Film> films = new HashMap<>();
+    private static final LocalDate EARLIEST_RELEASE_DATE = LocalDate.of(1895, 12, 28);
 
     @PostMapping
     public Film addFilm(@Valid @RequestBody Film film) {
         log.info("Добавление фильма: {}", film);
-        LocalDate earliestDate = LocalDate.of(1895, 12, 28);
-        if (film.getReleaseDate().isBefore(earliestDate)) {
-            throw new ValidationException("Дата релиза не может быть раньше 28 декабря 1895 года");
+        if (film.getReleaseDate().isBefore(EARLIEST_RELEASE_DATE)) {
+            throw new ValidationException("Дата релиза не может быть раньше " + EARLIEST_RELEASE_DATE);
         }
         film.setId(films.size() + 1);
         films.put(film.getId(), film);
@@ -58,9 +58,8 @@ public class FilmController {
         }
 
         if (film.getReleaseDate() != null) {
-            LocalDate earliestDate = LocalDate.of(1895, 12, 28);
-            if (film.getReleaseDate().isBefore(earliestDate)) {
-                throw new ValidationException("Дата релиза не может быть раньше 28 декабря 1895 года");
+            if (film.getReleaseDate().isBefore(EARLIEST_RELEASE_DATE)) {
+                throw new ValidationException("Дата релиза не может быть раньше " + EARLIEST_RELEASE_DATE);
             }
             existingFilm.setReleaseDate(film.getReleaseDate());
         }
@@ -72,7 +71,6 @@ public class FilmController {
             existingFilm.setDuration(film.getDuration());
         }
 
-        films.put(existingFilm.getId(), existingFilm);
         return existingFilm;
     }
 
