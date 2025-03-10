@@ -3,10 +3,13 @@ package ru.yandex.practicum.filmorate.model;
 import lombok.Data;
 import jakarta.validation.constraints.*;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 public class User {
-    private int id;
+    private Long id;
+    private Set<Long> friends = new HashSet<>();
 
     @NotBlank(message = "Электронная почта не может быть пустой")
     @Email(message = "Электронная почта должна содержать символ @")
@@ -18,9 +21,21 @@ public class User {
 
     private String name;
 
-    @PastOrPresent(message = "Дата рождения не может быть в будущем")
     @NotNull(message = "Дата рождения обязательна")
+    @PastOrPresent(message = "Дата рождения не может быть в будущем")
     private LocalDate birthday;
+
+    public Set<Long> getFriends() {
+        return friends;
+    }
+
+    public void addFriend(Long friendId) {
+        friends.add(friendId);
+    }
+
+    public void removeFriend(Long friendId) {
+        friends.remove(friendId);
+    }
 
     public String getName() {
         return (name == null || name.isBlank()) ? login : name;
