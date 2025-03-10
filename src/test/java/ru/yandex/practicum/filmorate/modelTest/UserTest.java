@@ -20,7 +20,6 @@ import jakarta.validation.ValidatorFactory;
 
 import java.time.LocalDate;
 import java.util.Collections;
-import java.util.List;
 
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
