@@ -5,19 +5,28 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.yandex.practicum.filmorate.controller.UserController;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
+
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
 
+import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 @WebMvcTest(UserController.class)
 public class UserTest {
@@ -30,10 +39,48 @@ public class UserTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @MockBean
+    private UserService userService;
+
     @BeforeEach
     public void setUp() {
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
+
+        when(userService.addUser(any(User.class))).thenAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            if (user.getEmail() == null || !user.getEmail().contains("@")) {
+                throw new ValidationException("Email должен содержать @");
+            }
+            if (user.getLogin() == null || user.getLogin().contains(" ")) {
+                throw new ValidationException("Логин не должен содержать пробелы");
+            }
+            if (user.getBirthday() == null || user.getBirthday().isAfter(LocalDate.now())) {
+                throw new ValidationException("Дата рождения не может быть в будущем");
+            }
+            if (user.getName() == null || user.getName().trim().isEmpty()) {
+                user.setName(user.getLogin());
+            }
+            user.setId(1L);
+            return user;
+        });
+
+        when(userService.getUserById(anyLong())).thenAnswer(invocation -> {
+            Long id = invocation.getArgument(0);
+            if (id <= 0) {
+                throw new NotFoundException("Пользователь с ID " + id + " не найден");
+            }
+            User user = new User();
+            user.setId(id);
+            user.setEmail("user" + id + "@example.com");
+            user.setLogin("user" + id);
+            user.setName("User " + id);
+            user.setBirthday(LocalDate.of(1990, 1, 1));
+            return user;
+        });
+
+        when(userService.getFriends(anyLong())).thenReturn(Collections.emptyList());
+        when(userService.getCommonFriends(anyLong(), anyLong())).thenReturn(Collections.emptyList());
     }
 
     @Test
@@ -84,7 +131,7 @@ public class UserTest {
     public void testNullLogin() {
         User user = new User();
         user.setEmail("user@example.com");
-        user.setLogin(null); // Null логин
+        user.setLogin(null);
         user.setName("User Name");
         user.setBirthday(LocalDate.of(1990, 1, 1));
 
@@ -168,7 +215,7 @@ public class UserTest {
         mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(user)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk()); // Исправлено с isCreated() на isOk()
     }
 
     @Test
@@ -253,5 +300,49 @@ public class UserTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(user)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void testAddFriend() throws Exception {
+        mockMvc.perform(put("/users/1/friends/2"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void testAddFriendWithInvalidUserId() throws Exception {
+        doThrow(new NotFoundException("Пользователь с ID -1 не найден"))
+                .when(userService).addFriend(eq(-1L), anyLong());
+
+        mockMvc.perform(put("/users/-1/friends/2"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    public void testRemoveFriend() throws Exception {
+        mockMvc.perform(delete("/users/1/friends/2"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void testRemoveFriendWithInvalidUserId() throws Exception {
+        doThrow(new NotFoundException("Пользователь с ID -1 не найден"))
+                .when(userService).removeFriend(eq(-1L), anyLong());
+
+        mockMvc.perform(delete("/users/-1/friends/2"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    public void testGetFriends() throws Exception {
+        mockMvc.perform(get("/users/1/friends"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+    }
+
+    @Test
+    public void testGetCommonFriends() throws Exception {
+        mockMvc.perform(get("/users/1/friends/common/2"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
     }
 }
