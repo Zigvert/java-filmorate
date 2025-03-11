@@ -1,6 +1,7 @@
 package ru.yandex.practicum.filmorate.model;
 
 import lombok.Data;
+import ru.yandex.practicum.filmorate.exception.Update;
 import jakarta.validation.constraints.*;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -8,6 +9,7 @@ import java.util.Set;
 
 @Data
 public class Film {
+    @NotNull(groups = Update.class, message = "ID обязателен для обновления")
     private Long id;
     private Set<Long> likes = new HashSet<>();
 
