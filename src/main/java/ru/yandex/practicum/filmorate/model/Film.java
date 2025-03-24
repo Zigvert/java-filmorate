@@ -1,12 +1,17 @@
 package ru.yandex.practicum.filmorate.model;
 
 import lombok.Data;
-import java.time.LocalDate;
+import ru.yandex.practicum.filmorate.exception.Update;
 import jakarta.validation.constraints.*;
+import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 public class Film {
-    private int id;
+    @NotNull(groups = Update.class, message = "ID обязателен для обновления")
+    private Long id;
+    private Set<Long> likes = new HashSet<>();
 
     @NotBlank(message = "Название фильма не может быть пустым")
     private String name;
@@ -15,9 +20,24 @@ public class Film {
     private String description;
 
     @NotNull(message = "Дата релиза обязательна")
-    @PastOrPresent(message = "Дата релиза не может быть в будущем")
     private LocalDate releaseDate;
 
     @Positive(message = "Продолжительность фильма должна быть положительной")
     private int duration;
+
+    public Set<Long> getLikes() {
+        return likes;
+    }
+
+    public void addLike(Long userId) {
+        likes.add(userId);
+    }
+
+    public void removeLike(Long userId) {
+        likes.remove(userId);
+    }
+
+    public int getLikesCount() {
+        return likes.size();
+    }
 }
