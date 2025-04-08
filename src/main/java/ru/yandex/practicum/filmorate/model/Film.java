@@ -1,43 +1,66 @@
 package ru.yandex.practicum.filmorate.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
-import ru.yandex.practicum.filmorate.exception.Update;
-import jakarta.validation.constraints.*;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class Film {
-    @NotNull(groups = Update.class, message = "ID обязателен для обновления")
     private Long id;
-    private Set<Long> likes = new HashSet<>();
-
-    @NotBlank(message = "Название фильма не может быть пустым")
     private String name;
-
-    @Size(max = 200, message = "Описание не должно превышать 200 символов")
     private String description;
-
-    @NotNull(message = "Дата релиза обязательна")
     private LocalDate releaseDate;
-
-    @Positive(message = "Продолжительность фильма должна быть положительной")
     private int duration;
+    private Set<Long> likes;
+    private Mpa mpa;
+    private List<Genre> genres;
 
     public Set<Long> getLikes() {
-        return likes;
+        return likes != null ? new HashSet<>(likes) : new HashSet<>();
+    }
+
+    public void setLikes(Set<Long> likes) {
+        this.likes = likes != null ? new HashSet<>(likes) : null;
     }
 
     public void addLike(Long userId) {
+        if (likes == null) {
+            likes = new HashSet<>();
+        }
         likes.add(userId);
     }
 
     public void removeLike(Long userId) {
-        likes.remove(userId);
+        if (likes != null) {
+            likes.remove(userId);
+        }
     }
 
     public int getLikesCount() {
-        return likes.size();
+        return likes != null ? likes.size() : 0;
+    }
+
+    public Mpa getMpa() {
+        return mpa;
+    }
+
+    public void setMpa(Mpa mpa) {
+        this.mpa = mpa;
+    }
+
+    public List<Genre> getGenres() {
+        return genres != null ? new ArrayList<>(genres) : new ArrayList<>();
+    }
+
+    public void setGenres(List<Genre> genres) {
+        this.genres = genres != null ? new ArrayList<>(genres) : null;
     }
 }
