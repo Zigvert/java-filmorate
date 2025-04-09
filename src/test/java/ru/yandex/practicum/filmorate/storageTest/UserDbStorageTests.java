@@ -92,10 +92,40 @@ class UserDbStorageTests {
         User savedUser2 = userStorage.addUser(user2);
 
         userStorage.addFriend(savedUser1.getId(), savedUser2.getId());
-        userStorage.removeFriend(savedUser1.getId(), savedUser2.getId());
-        List<User> friends = userStorage.getFriends(savedUser1.getId());
+        userStorage.addFriend(savedUser2.getId(), savedUser1.getId()); // Делаем дружбу двунаправленной
 
-        assertThat(friends).isEmpty();
+        userStorage.removeFriend(savedUser1.getId(), savedUser2.getId());
+        userStorage.removeFriend(savedUser2.getId(), savedUser1.getId());
+
+        List<User> friends1 = userStorage.getFriends(savedUser1.getId());
+        List<User> friends2 = userStorage.getFriends(savedUser2.getId());
+
+        assertThat(friends1).isEmpty();
+        assertThat(friends2).isEmpty();
+    }
+
+    @Test
+    void testBidirectionalFriendship() {
+        User user1 = new User(null, null, "user1@example.com", "user1", "User1", LocalDate.of(1990, 1, 1));
+        User user2 = new User(null, null, "user2@example.com", "user2", "User2", LocalDate.of(1990, 2, 2));
+        User savedUser1 = userStorage.addUser(user1);
+        User savedUser2 = userStorage.addUser(user2);
+
+        userStorage.addFriend(savedUser1.getId(), savedUser2.getId());
+        userStorage.addFriend(savedUser2.getId(), savedUser1.getId());
+
+        List<User> friends1Before = userStorage.getFriends(savedUser1.getId());
+        List<User> friends2Before = userStorage.getFriends(savedUser2.getId());
+        assertThat(friends1Before).hasSize(1);
+        assertThat(friends2Before).hasSize(1);
+
+        userStorage.removeFriend(savedUser1.getId(), savedUser2.getId());
+        userStorage.removeFriend(savedUser2.getId(), savedUser1.getId());
+
+        List<User> friends1After = userStorage.getFriends(savedUser1.getId());
+        List<User> friends2After = userStorage.getFriends(savedUser2.getId());
+        assertThat(friends1After).isEmpty();
+        assertThat(friends2After).isEmpty();
     }
 
     @Test

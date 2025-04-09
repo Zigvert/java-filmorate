@@ -9,11 +9,7 @@ import ru.yandex.practicum.filmorate.model.User;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Component
 @RequiredArgsConstructor
@@ -71,7 +67,9 @@ public class UserDbStorage implements UserStorage {
 
     @Override
     public List<User> getFriends(Long userId) {
-        String sql = "SELECT u.* FROM users u JOIN user_friends f ON u.id = f.friend_id WHERE f.user_id = ?";
+        String sql = "SELECT u.* FROM users u " +
+                "JOIN user_friends f ON u.id = f.friend_id " +
+                "WHERE f.user_id = ?";
         return jdbcTemplate.query(sql, this::mapRowToUser, userId);
     }
 
@@ -87,6 +85,14 @@ public class UserDbStorage implements UserStorage {
         String login = rs.getString("login");
         String name = rs.getString("name");
         LocalDate birthday = rs.getDate("birthday").toLocalDate();
-        return new User(id, new HashSet<>(), email, login, name, birthday);
+
+        String friendsSql = "SELECT friend_id FROM user_friends WHERE user_id = ?";
+        List<Long> friendIds = jdbcTemplate.query(
+                friendsSql,
+                (rsFriends, rowNumFriends) -> rsFriends.getLong("friend_id"),
+                id
+        );
+
+        return new User(id, new HashSet<>(friendIds), email, login, name, birthday);
     }
 }

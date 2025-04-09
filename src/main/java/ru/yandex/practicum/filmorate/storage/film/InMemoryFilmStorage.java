@@ -5,8 +5,9 @@ import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
-@Component
+@Component("inMemoryFilmStorage")
 public class InMemoryFilmStorage implements FilmStorage {
     private final Map<Long, Film> films = new HashMap<>();
     private long idCounter = 0;
@@ -17,6 +18,9 @@ public class InMemoryFilmStorage implements FilmStorage {
         if (film.getLikes() == null) {
             film.setLikes(new HashSet<>());
         }
+        if (film.getGenres() == null) {
+            film.setGenres(new ArrayList<>());
+        }
         films.put(film.getId(), film);
         return film;
     }
@@ -25,6 +29,12 @@ public class InMemoryFilmStorage implements FilmStorage {
     public Film updateFilm(Film film) {
         if (!films.containsKey(film.getId())) {
             throw new NotFoundException("Фильм с id=" + film.getId() + " не найден");
+        }
+        if (film.getLikes() == null) {
+            film.setLikes(new HashSet<>());
+        }
+        if (film.getGenres() == null) {
+            film.setGenres(new ArrayList<>());
         }
         films.put(film.getId(), film);
         return film;
@@ -60,5 +70,13 @@ public class InMemoryFilmStorage implements FilmStorage {
         Film film = getFilmById(filmId).orElseThrow(() ->
                 new NotFoundException("Фильм с id=" + filmId + " не найден"));
         film.getLikes().remove(userId);
+    }
+
+    @Override
+    public List<Film> getPopularFilms(int count) {
+        return films.values().stream()
+                .sorted((f1, f2) -> Integer.compare(f2.getLikes().size(), f1.getLikes().size()))
+                .limit(count)
+                .collect(Collectors.toList());
     }
 }

@@ -43,35 +43,34 @@ public class UserService {
         if (userId.equals(friendId)) {
             throw new IllegalArgumentException("Пользователь не может добавить себя в друзья");
         }
-        User user = getUserById(userId);
-        User friend = getUserById(friendId);
-        user.addFriend(friendId);
-        friend.addFriend(userId);
+
+        getUserById(userId);
+        getUserById(friendId);
+
+        userStorage.addFriend(userId, friendId);
     }
 
     public void removeFriend(Long userId, Long friendId) {
         if (userId.equals(friendId)) {
             throw new IllegalArgumentException("Пользователь не может удалить себя из друзей");
         }
-        User user = getUserById(userId);
-        User friend = getUserById(friendId);
-        user.removeFriend(friendId);
-        friend.removeFriend(userId);
+
+        getUserById(userId);
+        getUserById(friendId);
+
+        userStorage.removeFriend(userId, friendId);
     }
 
     public List<User> getFriends(Long userId) {
-        User user = getUserById(userId);
-        return user.getFriends().stream()
-                .map(this::getUserById)
-                .collect(Collectors.toList());
+        return userStorage.getFriends(userId);
     }
 
     public List<User> getCommonFriends(Long userId, Long otherId) {
-        User user = getUserById(userId);
-        User other = getUserById(otherId);
-        return user.getFriends().stream()
-                .filter(friendId -> other.getFriends().contains(friendId))
-                .map(this::getUserById)
+        List<User> userFriends = getFriends(userId);
+        List<User> otherFriends = getFriends(otherId);
+
+        return userFriends.stream()
+                .filter(otherFriends::contains)
                 .collect(Collectors.toList());
     }
 }
