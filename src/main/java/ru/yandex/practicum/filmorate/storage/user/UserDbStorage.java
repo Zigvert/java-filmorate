@@ -74,6 +74,15 @@ public class UserDbStorage implements UserStorage {
     }
 
     @Override
+    public List<User> getCommonFriends(Long userId, Long otherId) {
+        String sql = "SELECT u.* FROM users u " +
+                "JOIN user_friends f1 ON u.id = f1.friend_id " +
+                "JOIN user_friends f2 ON u.id = f2.friend_id " +
+                "WHERE f1.user_id = ? AND f2.user_id = ?";
+        return jdbcTemplate.query(sql, this::mapRowToUser, userId, otherId);
+    }
+
+    @Override
     public void deleteUser(Long userId) {
         String sql = "DELETE FROM users WHERE id = ?";
         jdbcTemplate.update(sql, userId);
@@ -86,13 +95,6 @@ public class UserDbStorage implements UserStorage {
         String name = rs.getString("name");
         LocalDate birthday = rs.getDate("birthday").toLocalDate();
 
-        String friendsSql = "SELECT friend_id FROM user_friends WHERE user_id = ?";
-        List<Long> friendIds = jdbcTemplate.query(
-                friendsSql,
-                (rsFriends, rowNumFriends) -> rsFriends.getLong("friend_id"),
-                id
-        );
-
-        return new User(id, new HashSet<>(friendIds), email, login, name, birthday);
+        return new User(id, new HashSet<>(), email, login, name, birthday);
     }
 }

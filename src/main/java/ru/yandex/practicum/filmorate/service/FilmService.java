@@ -1,7 +1,6 @@
 package ru.yandex.practicum.filmorate.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
@@ -15,14 +14,13 @@ import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 import ru.yandex.practicum.filmorate.storage.GenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.MpaDbStorage;
 
-import java.util.ArrayList;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class FilmService {
-    private static final Logger log = LoggerFactory.getLogger(FilmService.class);
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
     private final GenreDbStorage genreStorage;
@@ -32,8 +30,8 @@ public class FilmService {
 
     public FilmService(@Qualifier("filmDbStorage") FilmStorage filmStorage,
                        @Qualifier("userDbStorage") UserStorage userStorage,
-                       GenreDbStorage genreStorage,
-                       MpaDbStorage mpaStorage) {
+    GenreDbStorage genreStorage,
+    MpaDbStorage mpaStorage) {
         this.filmStorage = filmStorage;
         this.userStorage = userStorage;
         this.genreStorage = genreStorage;
@@ -42,8 +40,8 @@ public class FilmService {
 
     public Film addFilm(Film film) {
         validateFilm(film);
-        enrichMpa(film);
-        enrichGenres(film);
+        validateMpaExists(film);
+        validateGenresExist(film);
         Film addedFilm = filmStorage.addFilm(film);
         log.info("Added film: {}", addedFilm);
         return addedFilm;
@@ -51,8 +49,8 @@ public class FilmService {
 
     public Film updateFilm(Film film) {
         validateFilm(film);
-        enrichMpa(film);
-        enrichGenres(film);
+        validateMpaExists(film);
+        validateGenresExist(film);
         Film updatedFilm = filmStorage.updateFilm(film);
         log.info("Updated film: {}", updatedFilm);
         return updatedFilm;
@@ -97,25 +95,21 @@ public class FilmService {
         }
     }
 
-    private void enrichMpa(Film film) {
+    private void validateMpaExists(Film film) {
         if (film.getMpa() == null || film.getMpa().getId() == null) {
             throw new ValidationException("MPA-рейтинг обязателен");
         }
-        Mpa mpa = mpaStorage.getMpaById(film.getMpa().getId())
+        mpaStorage.getMpaById(film.getMpa().getId())
                 .orElseThrow(() -> new NotFoundException("MPA с id=" + film.getMpa().getId() + " не найден"));
-        film.setMpa(mpa);
     }
 
-    private void enrichGenres(Film film) {
+    private void validateGenresExist(Film film) {
         if (film.getGenres() != null && !film.getGenres().isEmpty()) {
-            List<Genre> updatedGenres = film.getGenres().stream()
-                    .map(genre -> genreStorage.getGenreById(genre.getId())
-                            .orElseThrow(() -> new NotFoundException("Жанр с id=" + genre.getId() + " не найден")))
+            film.getGenres().stream()
+                    .map(Genre::getId)
                     .distinct()
-                    .collect(Collectors.toList());
-            film.setGenres(updatedGenres);
-        } else {
-            film.setGenres(new ArrayList<>());
+                    .forEach(id -> genreStorage.getGenreById(id)
+                            .orElseThrow(() -> new NotFoundException("Жанр с id=" + id + " не найден")));
         }
     }
 

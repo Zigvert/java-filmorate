@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -8,8 +9,8 @@ import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class UserService {
     private final UserStorage userStorage;
@@ -20,57 +21,64 @@ public class UserService {
     }
 
     public User addUser(User user) {
-        return userStorage.addUser(user);
+        User addedUser = userStorage.addUser(user);
+        log.info("Added user: {}", addedUser);
+        return addedUser;
     }
 
     public User updateUser(User user) {
         if (user.getId() == null || !userStorage.getUserById(user.getId()).isPresent()) {
             throw new NotFoundException("Пользователь с id=" + user.getId() + " не найден");
         }
-        return userStorage.updateUser(user);
+        User updatedUser = userStorage.updateUser(user);
+        log.info("Updated user: {}", updatedUser);
+        return updatedUser;
     }
 
     public List<User> getAllUsers() {
-        return userStorage.getAllUsers();
+        List<User> users = userStorage.getAllUsers();
+        log.info("Returning all users: {}", users);
+        return users;
     }
 
     public User getUserById(Long id) {
-        return userStorage.getUserById(id)
+        User user = userStorage.getUserById(id)
                 .orElseThrow(() -> new NotFoundException("Пользователь с id=" + id + " не найден"));
+        log.info("Returning user: {}", user);
+        return user;
     }
 
     public void addFriend(Long userId, Long friendId) {
         if (userId.equals(friendId)) {
             throw new IllegalArgumentException("Пользователь не может добавить себя в друзья");
         }
-
         getUserById(userId);
         getUserById(friendId);
-
         userStorage.addFriend(userId, friendId);
+        log.info("User {} added friend {}", userId, friendId);
     }
 
     public void removeFriend(Long userId, Long friendId) {
         if (userId.equals(friendId)) {
             throw new IllegalArgumentException("Пользователь не может удалить себя из друзей");
         }
-
         getUserById(userId);
         getUserById(friendId);
-
         userStorage.removeFriend(userId, friendId);
+        log.info("User {} removed friend {}", userId, friendId);
     }
 
     public List<User> getFriends(Long userId) {
-        return userStorage.getFriends(userId);
+        List<User> friends = userStorage.getFriends(userId);
+        log.info("Returning friends of user {}: {}", userId, friends);
+        return friends;
     }
 
     public List<User> getCommonFriends(Long userId, Long otherId) {
-        List<User> userFriends = getFriends(userId);
-        List<User> otherFriends = getFriends(otherId);
-
-        return userFriends.stream()
-                .filter(otherFriends::contains)
-                .collect(Collectors.toList());
+        getUserById(userId);
+        getUserById(otherId);
+        List<User> commonFriends = userStorage.getCommonFriends(userId, otherId);
+        log.info("Returning common friends between user {} and user {}: {}", userId, otherId, commonFriends);
+        return commonFriends;
     }
 }
