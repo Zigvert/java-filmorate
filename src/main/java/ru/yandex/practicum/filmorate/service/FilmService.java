@@ -15,6 +15,7 @@ import ru.yandex.practicum.filmorate.storage.MpaDbStorage;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -28,8 +29,8 @@ public class FilmService {
 
     public FilmService(@Qualifier("filmDbStorage") FilmStorage filmStorage,
                        @Qualifier("userDbStorage") UserStorage userStorage,
-    GenreDbStorage genreStorage,
-    MpaDbStorage mpaStorage) {
+                       GenreDbStorage genreStorage,
+                       MpaDbStorage mpaStorage) {
         this.filmStorage = filmStorage;
         this.userStorage = userStorage;
         this.genreStorage = genreStorage;
@@ -103,11 +104,21 @@ public class FilmService {
 
     private void validateGenresExist(Film film) {
         if (film.getGenres() != null && !film.getGenres().isEmpty()) {
-            film.getGenres().stream()
+            List<Long> genreIds = film.getGenres().stream()
                     .map(Genre::getId)
                     .distinct()
-                    .forEach(id -> genreStorage.getGenreById(id)
-                            .orElseThrow(() -> new NotFoundException("Жанр с id=" + id + " не найден")));
+                    .collect(Collectors.toList());
+
+            List<Genre> foundGenres = genreStorage.getGenresByIds(genreIds);
+            if (foundGenres.size() != genreIds.size()) {
+                List<Long> foundIds = foundGenres.stream()
+                        .map(Genre::getId)
+                        .collect(Collectors.toList());
+                List<Long> missingIds = genreIds.stream()
+                        .filter(id -> !foundIds.contains(id))
+                        .collect(Collectors.toList());
+                throw new NotFoundException("Жанры с id=" + missingIds + " не найдены");
+            }
         }
     }
 

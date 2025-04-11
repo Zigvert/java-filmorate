@@ -5,7 +5,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataAccessException;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -14,6 +13,7 @@ import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
+import ru.yandex.practicum.filmorate.storage.GenreDbStorage;
 
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -29,6 +29,7 @@ public class FilmDbStorage implements FilmStorage {
 
     private static final Logger log = LoggerFactory.getLogger(FilmDbStorage.class);
     private final JdbcTemplate jdbcTemplate;
+    private final GenreDbStorage genreDbStorage;
 
     @Override
     public Film addFilm(Film film) {
@@ -50,10 +51,10 @@ public class FilmDbStorage implements FilmStorage {
             Long filmId = keyHolder.getKey().longValue();
             updateGenres(filmId, film.getGenres());
             log.info("Film added with id {}: {}", filmId, film);
-            return getFilmById(filmId).orElseThrow(() -> new RuntimeException("Фильм не найден после добавления"));
+            return getFilmById(filmId).orElseThrow(() -> new NotFoundException("Фильм с id=" + filmId + " не найден после добавления"));
         } catch (DataAccessException e) {
             log.error("Error adding film: {}", e.getMessage(), e);
-            throw new RuntimeException("Ошибка при добавлении фильма", e);
+            throw e;
         }
     }
 
@@ -82,7 +83,7 @@ public class FilmDbStorage implements FilmStorage {
                     .orElseThrow(() -> new NotFoundException("Фильм с id=" + film.getId() + " не найден после обновления"));
         } catch (DataAccessException e) {
             log.error("Error updating film with id {}: {}", film.getId(), e.getMessage(), e);
-            throw new RuntimeException("Ошибка при обновлении фильма", e);
+            throw e; // Пробрасываем оригинальное исключение
         }
     }
 
@@ -99,7 +100,7 @@ public class FilmDbStorage implements FilmStorage {
             log.info("Film with id {} deleted", id);
         } catch (DataAccessException e) {
             log.error("Error deleting film with id {}: {}", id, e.getMessage(), e);
-            throw new RuntimeException("Ошибка при удалении фильма", e);
+            throw e;
         }
     }
 
@@ -112,20 +113,19 @@ public class FilmDbStorage implements FilmStorage {
                 "WHERE f.id = ?";
 
         try {
-            Film film = jdbcTemplate.queryForObject(sql, this::mapRowToFilm, id);
+            List<Film> films = jdbcTemplate.query(sql, this::mapRowToFilm, id);
+            Film film = films.isEmpty() ? null : films.get(0);
             if (film != null) {
                 film.setGenres(getGenresByFilmId(id));
                 film.setLikes(new HashSet<>(getLikesByFilmId(id)));
                 log.info("Found film with id {}: {}", id, film);
-                return Optional.of(film);
+            } else {
+                log.info("Film with id {} not found", id);
             }
-            return Optional.empty();
-        } catch (EmptyResultDataAccessException e) {
-            log.info("Film with id {} not found", id);
-            return Optional.empty();
+            return Optional.ofNullable(film);
         } catch (DataAccessException e) {
             log.error("Error retrieving film with id {}: {}", id, e.getMessage(), e);
-            throw new RuntimeException("Ошибка при получении фильма", e);
+            throw e;
         }
     }
 
@@ -149,7 +149,7 @@ public class FilmDbStorage implements FilmStorage {
             return films;
         } catch (DataAccessException e) {
             log.error("Error retrieving all films: {}", e.getMessage(), e);
-            throw new RuntimeException("Ошибка при получении списка фильмов", e);
+            throw e;
         }
     }
 
@@ -162,7 +162,7 @@ public class FilmDbStorage implements FilmStorage {
             log.info("Like added to film {} by user {}", filmId, userId);
         } catch (DataAccessException e) {
             log.error("Error adding like to film {} by user {}: {}", filmId, userId, e.getMessage(), e);
-            throw new RuntimeException("Не удалось добавить лайк: фильм или пользователь не найден", e);
+            throw e;
         }
     }
 
@@ -178,7 +178,7 @@ public class FilmDbStorage implements FilmStorage {
             log.info("Like removed from film {} by user {}", filmId, userId);
         } catch (DataAccessException e) {
             log.error("Error removing like from film {} by user {}: {}", filmId, userId, e.getMessage(), e);
-            throw new RuntimeException("Ошибка при удалении лайка", e);
+            throw e;
         }
     }
 
@@ -206,7 +206,7 @@ public class FilmDbStorage implements FilmStorage {
             return films;
         } catch (DataAccessException e) {
             log.error("Error retrieving popular films: {}", e.getMessage(), e);
-            throw new RuntimeException("Ошибка при получении популярных фильмов", e);
+            throw e;
         }
     }
 
@@ -214,8 +214,21 @@ public class FilmDbStorage implements FilmStorage {
         try {
             jdbcTemplate.update("DELETE FROM film_genres WHERE film_id = ?", filmId);
             if (genres != null && !genres.isEmpty()) {
+                List<Long> genreIds = genres.stream()
+                        .map(Genre::getId)
+                        .distinct()
+                        .collect(Collectors.toList());
+                List<Genre> existingGenres = genreDbStorage.getGenresByIds(genreIds);
+                if (existingGenres.size() != genreIds.size()) {
+                    List<Long> existingIds = existingGenres.stream()
+                            .map(Genre::getId)
+                            .collect(Collectors.toList());
+                    List<Long> missingIds = genreIds.stream()
+                            .filter(id -> !existingIds.contains(id))
+                            .collect(Collectors.toList());
+                    throw new NotFoundException("Жанры с id=" + missingIds + " не найдены");
+                }
                 String genreSql = "INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)";
-                // Убираем дубликаты жанров перед вставкой
                 List<Object[]> batchArgs = genres.stream()
                         .distinct()
                         .map(genre -> new Object[]{filmId, genre.getId()})
@@ -224,7 +237,7 @@ public class FilmDbStorage implements FilmStorage {
             }
         } catch (DataAccessException e) {
             log.error("Error updating genres for film {}: {}", filmId, e.getMessage(), e);
-            throw new RuntimeException("Ошибка при обновлении жанров фильма", e);
+            throw e;
         }
     }
 
@@ -240,7 +253,7 @@ public class FilmDbStorage implements FilmStorage {
             }
         } catch (DataAccessException e) {
             log.error("Error updating likes for film {}: {}", filmId, e.getMessage(), e);
-            throw new RuntimeException("Ошибка при обновлении лайков фильма", e);
+            throw e;
         }
     }
 
@@ -262,7 +275,7 @@ public class FilmDbStorage implements FilmStorage {
             ));
         } catch (DataAccessException e) {
             log.error("Error retrieving genres for films: {}", e.getMessage(), e);
-            throw new RuntimeException("Ошибка при получении жанров для фильмов", e);
+            throw e;
         }
     }
 
@@ -282,7 +295,7 @@ public class FilmDbStorage implements FilmStorage {
             ));
         } catch (DataAccessException e) {
             log.error("Error retrieving likes for films: {}", e.getMessage(), e);
-            throw new RuntimeException("Ошибка при получении лайков для фильмов", e);
+            throw e;
         }
     }
 
@@ -296,7 +309,7 @@ public class FilmDbStorage implements FilmStorage {
             return jdbcTemplate.query(sql, (rs, rowNum) -> new Genre(rs.getLong("id"), rs.getString("name")), filmId);
         } catch (DataAccessException e) {
             log.error("Error retrieving genres for film {}: {}", filmId, e.getMessage(), e);
-            throw new RuntimeException("Ошибка при получении жанров фильма", e);
+            throw e;
         }
     }
 
@@ -306,7 +319,7 @@ public class FilmDbStorage implements FilmStorage {
             return jdbcTemplate.queryForList(sql, Long.class, filmId);
         } catch (DataAccessException e) {
             log.error("Error retrieving likes for film {}: {}", filmId, e.getMessage(), e);
-            throw new RuntimeException("Ошибка при получении лайков фильма", e);
+            throw e;
         }
     }
 

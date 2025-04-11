@@ -9,16 +9,20 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @JdbcTest
 @AutoConfigureTestDatabase
@@ -32,6 +36,9 @@ class FilmDbStorageTests {
     @BeforeEach
     void setUp() {
         jdbcTemplate.update("DELETE FROM users");
+        jdbcTemplate.update("DELETE FROM films");
+        jdbcTemplate.update("DELETE FROM film_genres");
+        jdbcTemplate.update("DELETE FROM film_likes");
 
         jdbcTemplate.update(
                 "INSERT INTO users (id, email, login, name, birthday) VALUES (?, ?, ?, ?, ?)",
@@ -54,6 +61,31 @@ class FilmDbStorageTests {
     }
 
     @Test
+    void testAddFilmWithGenres() {
+        List<Genre> genres = Arrays.asList(new Genre(1L, "Comedy"), new Genre(2L, "Drama"));
+        Film film = new Film(null, "Test Film", "Description", LocalDate.of(2020, 1, 1), 120, null,
+                new Mpa(1L, "G"), genres);
+        Film savedFilm = filmStorage.addFilm(film);
+
+        assertThat(savedFilm).isNotNull();
+        assertThat(savedFilm.getId()).isGreaterThan(0);
+        assertThat(savedFilm.getGenres())
+                .hasSize(2)
+                .extracting(Genre::getId)
+                .containsExactlyInAnyOrder(1L, 2L);
+    }
+
+    @Test
+    void testAddFilmWithNonExistentGenre() {
+        List<Genre> genres = Arrays.asList(new Genre(999L, "NonExistent"));
+        Film film = new Film(null, "Test Film", "Description", LocalDate.of(2020, 1, 1), 120, null,
+                new Mpa(1L, "G"), genres);
+
+        NotFoundException exception = assertThrows(NotFoundException.class, () -> filmStorage.addFilm(film));
+        assertThat(exception.getMessage()).contains("Жанры с id=[999]");
+    }
+
+    @Test
     void testUpdateFilm() {
         Film film = new Film(null, "Test Film", "Description", LocalDate.of(2020, 1, 1), 120, null,
                 new Mpa(1L, "G"), new ArrayList<>());
@@ -63,6 +95,35 @@ class FilmDbStorageTests {
         Film updatedFilm = filmStorage.updateFilm(savedFilm);
 
         assertThat(updatedFilm.getName()).isEqualTo("Updated Film");
+    }
+
+    @Test
+    void testUpdateFilmWithGenres() {
+        Film film = new Film(null, "Test Film", "Description", LocalDate.of(2020, 1, 1), 120, null,
+                new Mpa(1L, "G"), new ArrayList<>());
+        Film savedFilm = filmStorage.addFilm(film);
+
+        List<Genre> genres = Arrays.asList(new Genre(1L, "Comedy"), new Genre(2L, "Drama"));
+        savedFilm.setGenres(genres);
+        Film updatedFilm = filmStorage.updateFilm(savedFilm);
+
+        assertThat(updatedFilm.getGenres())
+                .hasSize(2)
+                .extracting(Genre::getId)
+                .containsExactlyInAnyOrder(1L, 2L);
+    }
+
+    @Test
+    void testUpdateFilmWithNonExistentGenre() {
+        Film film = new Film(null, "Test Film", "Description", LocalDate.of(2020, 1, 1), 120, null,
+                new Mpa(1L, "G"), new ArrayList<>());
+        Film savedFilm = filmStorage.addFilm(film);
+
+        List<Genre> genres = Arrays.asList(new Genre(999L, "NonExistent"));
+        savedFilm.setGenres(genres);
+
+        NotFoundException exception = assertThrows(NotFoundException.class, () -> filmStorage.updateFilm(savedFilm));
+        assertThat(exception.getMessage()).contains("Жанры с id=[999]");
     }
 
     @Test
@@ -99,7 +160,7 @@ class FilmDbStorageTests {
         Film savedFilm = filmStorage.addFilm(film);
 
         filmStorage.addLike(savedFilm.getId(), 1L);
-        Film filmWithLike = filmStorage.getFilmById(savedFilm.getId()).get();
+        Film filmWithLike = filmStorage.getFilmById(savedFilm.getId()).orElseThrow();
 
         assertThat(filmWithLike.getLikes()).contains(1L);
     }
@@ -112,7 +173,7 @@ class FilmDbStorageTests {
 
         filmStorage.addLike(savedFilm.getId(), 1L);
         filmStorage.removeLike(savedFilm.getId(), 1L);
-        Film filmWithoutLike = filmStorage.getFilmById(savedFilm.getId()).get();
+        Film filmWithoutLike = filmStorage.getFilmById(savedFilm.getId()).orElseThrow();
 
         assertThat(filmWithoutLike.getLikes()).isEmpty();
     }
