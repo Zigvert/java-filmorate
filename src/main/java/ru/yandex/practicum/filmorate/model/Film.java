@@ -1,33 +1,37 @@
 package ru.yandex.practicum.filmorate.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
-import ru.yandex.practicum.filmorate.exception.Update;
+import lombok.NoArgsConstructor;
 import jakarta.validation.constraints.*;
+
 import java.time.LocalDate;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class Film {
-    @NotNull(groups = Update.class, message = "ID обязателен для обновления")
     private Long id;
-    private Set<Long> likes = new HashSet<>();
 
     @NotBlank(message = "Название фильма не может быть пустым")
     private String name;
 
-    @Size(max = 200, message = "Описание не должно превышать 200 символов")
+    @Size(max = 200, message = "Описание не может быть длиннее 200 символов")
     private String description;
 
     @NotNull(message = "Дата релиза обязательна")
     private LocalDate releaseDate;
 
-    @Positive(message = "Продолжительность фильма должна быть положительной")
+    @Positive(message = "Длительность фильма должна быть положительной")
     private int duration;
 
-    public Set<Long> getLikes() {
-        return likes;
-    }
+    private Set<Long> likes = new HashSet<>();
+
+    @NotNull(message = "MPA обязателен")
+    private Mpa mpa;
+
+    private List<Genre> genres = new ArrayList<>();
 
     public void addLike(Long userId) {
         likes.add(userId);
