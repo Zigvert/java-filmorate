@@ -7,7 +7,6 @@ import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.storage.GenreDbStorage;
-import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -31,21 +30,5 @@ public class GenreController {
                 .orElseThrow(() -> new NotFoundException("Жанр с id=" + id + " не найден"));
         log.info("Returning genre: {}", genre);
         return genre;
-    }
-
-    @PostMapping
-    public Genre createGenre(@Valid @RequestBody Genre genre) {
-        log.info("Creating genre: {}", genre);
-        Genre createdGenre = genreDbStorage.createGenre(genre);
-        log.info("Created genre: {}", createdGenre);
-        return createdGenre;
-    }
-
-    @PutMapping
-    public Genre updateGenre(@Valid @RequestBody Genre genre) {
-        log.info("Updating genre: {}", genre);
-        Genre updatedGenre = genreDbStorage.updateGenre(genre);
-        log.info("Updated genre: {}", updatedGenre);
-        return updatedGenre;
     }
 }
